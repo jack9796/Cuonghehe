@@ -7,6 +7,124 @@ local gui = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
 gui.Name = "Nhím_hehe"
 gui.ResetOnSpawn = false
 
+-- Label trạng thái hiện trên cùng màn hình
+local statusLabel = Instance.new("TextLabel", gui)
+statusLabel.Size = UDim2.new(1, 0, 0, 50)
+statusLabel.Position = UDim2.new(0, 0, 0, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.TextSize = 30
+statusLabel.Text = ""
+statusLabel.TextStrokeTransparency = 0.5
+statusLabel.ZIndex = 2
+
+-- Nút nhỏ để bật/tắt GUI
+local toggleButton = Instance.new("TextButton", gui)
+toggleButton.Size = UDim2.new(0, 50, 0, 50)
+toggleButton.Position = UDim2.new(1, -60, 0, 10)
+toggleButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 20
+toggleButton.Text = "GUI"
+toggleButton.Visible = true
+toggleButton.ZIndex = 3  -- Đè trên hết
+
+toggleButton.MouseButton1Click:Connect(function()
+    gui.Enabled = not gui.Enabled
+    if gui.Enabled then
+        lastInteraction = tick()
+    end
+end)
+
+-- Âm click nhẹ
+local clickSound = Instance.new("Sound", gui)
+clickSound.SoundId = "rbxassetid://12222005"
+clickSound.Volume = 1
+
+-- Auto ẩn GUI sau 30s nếu không bấm
+local lastInteraction = tick()
+local function resetTimer()
+    lastInteraction = tick()
+    gui.Enabled = true
+end
+
+game:GetService("UserInputService").InputBegan:Connect(function()
+    resetTimer()
+end)
+
+task.spawn(function()
+    while true do
+        if tick() - lastInteraction > 30 then
+            gui.Enabled = false
+        end
+        task.wait(1)
+    end
+end)
+
+local function lerpColor(color1, color2, alpha)
+	return Color3.new(
+		color1.R + (color2.R - color1.R) * alpha,
+		color1.G + (color2.G - color1.G) * alpha,
+		color1.B + (color2.B - color1.B) * alpha
+	)
+end
+
+-- Làm label nhấp nháy màu
+task.spawn(function()
+	local t = 0
+	while true do
+		t += 0.01
+		local c1 = Color3.fromRGB(255, 255, 255)
+		local c2 = Color3.fromRGB(0, 200, 255)
+		local c3 = Color3.fromRGB(255, 100, 200)
+		local phase = math.sin(t) * 0.5 + 0.5
+
+		if phase < 0.5 then
+			statusLabel.TextColor3 = lerpColor(c1, c2, phase * 2)
+		else
+			statusLabel.TextColor3 = lerpColor(c2, c3, (phase - 0.5) * 2)
+		end
+
+		statusLabel.TextTransparency = 0.3 + 0.4 * math.abs(math.sin(t * 2))
+		task.wait(0.02)
+	end
+end)
+
+local autoHeal = false
+local resetSpeed = false
+local teleportOnAttack = false
+local teleportOnDeath = false
+local teleportOnOut = false
+local invisibilityEnabled = false
+
+local function updateStatus()
+    local texts = {}
+    if autoHeal then table.insert(texts, "tự hồi máu") end
+    if resetSpeed then table.insert(texts, "chỉnh speed") end
+    if teleportOnAttack then table.insert(texts, "TP on attack") end
+    if teleportOnDeath then table.insert(texts, "TP on death") end
+    if teleportOnOut then table.insert(texts, "TP on out") end
+    if invisibilityEnabled then table.insert(texts, "tàng hình") end
+
+    if #texts > 0 then
+        statusLabel.Text = "thk cường đang " .. table.concat(texts, ", ")
+    else
+        statusLabel.Text = ""
+    end
+end
+
+local function smoothColorChange(button, targetColor)
+    task.spawn(function()
+        local current = button.BackgroundColor3
+        for i = 0, 1, 0.05 do
+            button.BackgroundColor3 = lerpColor(current, targetColor, i)
+            task.wait(0.01)
+        end
+    end)
+end
+
 local function createButton(name, posY, callback)
 	local btn = Instance.new("TextButton", gui)
 	btn.Size = UDim2.new(0, 200, 0, 30)
@@ -16,123 +134,96 @@ local function createButton(name, posY, callback)
 	btn.Font = Enum.Font.SourceSansBold
 	btn.TextSize = 18
 	btn.Text = "Bật " .. name
+	btn.ZIndex = 2
 	local enabled = false
+
 	btn.MouseButton1Click:Connect(function()
 		enabled = not enabled
 		btn.Text = (enabled and "Tắt " or "Bật ") .. name
-		btn.BackgroundColor3 = enabled and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 180, 75)
+		clickSound:Play()
+		smoothColorChange(btn, enabled and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 180, 75))
 		callback(enabled)
+		updateStatus()
+		resetTimer()
 	end)
 end
 
-local autoHeal = false
-local resetSpeed = false
-local teleportOnAttack = false
-local teleportOnDeath = false
-local teleportOnOut = false
-local invisibilityEnabled = false  -- Thêm biến kiểm tra chế độ tàng hình
-
-createButton("Tự hồi máu", 20, function(on)
+createButton("Tự hồi máu", 60, function(on)
 	autoHeal = on
 end)
 
-createButton("Chỉnh Speed", 60, function(on)
+createButton("Chỉnh Speed", 100, function(on)
 	resetSpeed = on
 end)
 
-createButton("TP on Attack", 100, function(on)
+createButton("TP on Attack", 140, function(on)
 	teleportOnAttack = on
 end)
 
-createButton("TP on Death", 140, function(on)
+createButton("TP on Death", 180, function(on)
 	teleportOnDeath = on
 end)
 
-createButton("TP on Out", 180, function(on)
+createButton("TP on Out", 220, function(on)
 	teleportOnOut = on
 end)
 
-createButton("Tàng Hình", 220, function(on)  -- Nút bật/tắt tàng hình
+createButton("Tàng Hình", 260, function(on)
 	invisibilityEnabled = on
 	if invisibilityEnabled then
-		-- Tàng hình nhân vật
 		for _, part in pairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
-				part.LocalTransparencyModifier = 100  -- Làm mờ các bộ phận của nhân vật
+				part.LocalTransparencyModifier = 1
 			end
 		end
-		hum.Health = hum.Health  -- Đảm bảo sức khỏe không bị thay đổi khi tàng hình
-		char.Head.LocalTransparencyModifier = 100  -- Tàng hình cả đầu
 	else
-		-- Hủy tàng hình
 		for _, part in pairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
-				part.LocalTransparencyModifier = 0  -- Khôi phục lại bình thường
+				part.LocalTransparencyModifier = 0
 			end
 		end
-		char.Head.LocalTransparencyModifier = 0  -- Khôi phục lại đầu bình thường
 	end
 end)
 
--- Chức năng teleport khi bị tấn công
-local function teleportBehindPlayer(target)
-	if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-		local targetHRP = target.Character.HumanoidRootPart
-		local direction = (hrp.Position - targetHRP.Position).unit
-		local teleportPos = targetHRP.Position + direction * 5  -- Đẩy ra sau 5 studs
-		hrp.CFrame = CFrame.new(teleportPos)
-	end
-end
-
--- Tìm người chơi khác để teleport sau khi chết hoặc bị out
-local function teleportToRandomPlayer()
-	local players = game.Players:GetPlayers()
-	local randomPlayer = nil
-	for _, player in pairs(players) do
-		if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			randomPlayer = player
-			break
-		end
-	end
-	if randomPlayer then
-		teleportBehindPlayer(randomPlayer)
-	end
-end
-
--- Kiểm tra khi bị tấn công
-hum.Died:Connect(function()
-	-- Khi bị chết, teleport tới người chơi khác
-	if teleportOnDeath then
-		teleportToRandomPlayer()
-	end
-end)
-
--- Kiểm tra khi người chơi bị out
-game.Players.PlayerRemoving:Connect(function(player)
-	-- Khi người chơi thoát, teleport tới người chơi khác
-	if teleportOnOut then
-		teleportToRandomPlayer()
-	end
-end)
-
--- Lắng nghe va chạm với cheater (có thể là vũ khí hoặc các thao tác khác)
 game:GetService("RunService").Heartbeat:Connect(function()
 	if teleportOnAttack then
 		for _, player in pairs(game.Players:GetPlayers()) do
 			if player ~= lp and player.Character then
 				local attacker = player.Character:FindFirstChild("HumanoidRootPart")
-				if attacker and (hrp.Position - attacker.Position).Magnitude < 10 then  -- Nếu có khoảng cách gần
-					teleportBehindPlayer(player)
+				if attacker and (hrp.Position - attacker.Position).Magnitude < 10 then
+					hrp.CFrame = CFrame.new(attacker.Position + (hrp.Position - attacker.Position).unit * 5)
 				end
 			end
 		end
 	end
 
-	-- Auto Heal và Reset Speed
-	if autoHeal and hum.Health < 100 then
-		hum.Health = 1000
+	if autoHeal and hum.Health < hum.MaxHealth then
+		hum.Health = hum.MaxHealth
 	end
-	if resetSpeed and hum.WalkSpeed ~= 16 then
-		hum.WalkSpeed = 100  -- Đặt về giá trị mặc định của Roblox
+
+	if resetSpeed and hum.WalkSpeed ~= 100 then
+		hum.WalkSpeed = 100
+	end
+end)
+
+hum.Died:Connect(function()
+	if teleportOnDeath then
+		for _, player in pairs(game.Players:GetPlayers()) do
+			if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				hrp.CFrame = player.Character.HumanoidRootPart.CFrame
+				break
+			end
+		end
+	end
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+	if teleportOnOut then
+		for _, player in pairs(game.Players:GetPlayers()) do
+			if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				hrp.CFrame = player.Character.HumanoidRootPart.CFrame
+				break
+			end
+		end
 	end
 end)
