@@ -1,0 +1,138 @@
+local lp = game.Players.LocalPlayer
+local char = lp.Character or lp.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local gui = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
+gui.Name = "Nhím_hehe"
+gui.ResetOnSpawn = false
+
+local function createButton(name, posY, callback)
+	local btn = Instance.new("TextButton", gui)
+	btn.Size = UDim2.new(0, 200, 0, 30)
+	btn.Position = UDim2.new(0, 20, 0, posY)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 18
+	btn.Text = "Bật " .. name
+	local enabled = false
+	btn.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		btn.Text = (enabled and "Tắt " or "Bật ") .. name
+		btn.BackgroundColor3 = enabled and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(60, 180, 75)
+		callback(enabled)
+	end)
+end
+
+local autoHeal = false
+local resetSpeed = false
+local teleportOnAttack = false
+local teleportOnDeath = false
+local teleportOnOut = false
+local invisibilityEnabled = false  -- Thêm biến kiểm tra chế độ tàng hình
+
+createButton("Tự hồi máu", 20, function(on)
+	autoHeal = on
+end)
+
+createButton("Chỉnh Speed", 60, function(on)
+	resetSpeed = on
+end)
+
+createButton("TP on Attack", 100, function(on)
+	teleportOnAttack = on
+end)
+
+createButton("TP on Death", 140, function(on)
+	teleportOnDeath = on
+end)
+
+createButton("TP on Out", 180, function(on)
+	teleportOnOut = on
+end)
+
+createButton("Tàng Hình", 220, function(on)  -- Nút bật/tắt tàng hình
+	invisibilityEnabled = on
+	if invisibilityEnabled then
+		-- Tàng hình nhân vật
+		for _, part in pairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.LocalTransparencyModifier = 100  -- Làm mờ các bộ phận của nhân vật
+			end
+		end
+		hum.Health = hum.Health  -- Đảm bảo sức khỏe không bị thay đổi khi tàng hình
+		char.Head.LocalTransparencyModifier = 100  -- Tàng hình cả đầu
+	else
+		-- Hủy tàng hình
+		for _, part in pairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.LocalTransparencyModifier = 0  -- Khôi phục lại bình thường
+			end
+		end
+		char.Head.LocalTransparencyModifier = 0  -- Khôi phục lại đầu bình thường
+	end
+end)
+
+-- Chức năng teleport khi bị tấn công
+local function teleportBehindPlayer(target)
+	if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+		local targetHRP = target.Character.HumanoidRootPart
+		local direction = (hrp.Position - targetHRP.Position).unit
+		local teleportPos = targetHRP.Position + direction * 5  -- Đẩy ra sau 5 studs
+		hrp.CFrame = CFrame.new(teleportPos)
+	end
+end
+
+-- Tìm người chơi khác để teleport sau khi chết hoặc bị out
+local function teleportToRandomPlayer()
+	local players = game.Players:GetPlayers()
+	local randomPlayer = nil
+	for _, player in pairs(players) do
+		if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			randomPlayer = player
+			break
+		end
+	end
+	if randomPlayer then
+		teleportBehindPlayer(randomPlayer)
+	end
+end
+
+-- Kiểm tra khi bị tấn công
+hum.Died:Connect(function()
+	-- Khi bị chết, teleport tới người chơi khác
+	if teleportOnDeath then
+		teleportToRandomPlayer()
+	end
+end)
+
+-- Kiểm tra khi người chơi bị out
+game.Players.PlayerRemoving:Connect(function(player)
+	-- Khi người chơi thoát, teleport tới người chơi khác
+	if teleportOnOut then
+		teleportToRandomPlayer()
+	end
+end)
+
+-- Lắng nghe va chạm với cheater (có thể là vũ khí hoặc các thao tác khác)
+game:GetService("RunService").Heartbeat:Connect(function()
+	if teleportOnAttack then
+		for _, player in pairs(game.Players:GetPlayers()) do
+			if player ~= lp and player.Character then
+				local attacker = player.Character:FindFirstChild("HumanoidRootPart")
+				if attacker and (hrp.Position - attacker.Position).Magnitude < 10 then  -- Nếu có khoảng cách gần
+					teleportBehindPlayer(player)
+				end
+			end
+		end
+	end
+
+	-- Auto Heal và Reset Speed
+	if autoHeal and hum.Health < 100 then
+		hum.Health = 1000
+	end
+	if resetSpeed and hum.WalkSpeed ~= 16 then
+		hum.WalkSpeed = 100  -- Đặt về giá trị mặc định của Roblox
+	end
+end)
